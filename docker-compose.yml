@@ -1,0 +1,22 @@
+
+services:
+  napcat:
+    image: mlikiowa/napcat-docker:latest
+    container_name: napcat
+    environment:
+      - TZ=Asia/Shanghai
+      - NAPCAT_UID=1000
+      - NAPCAT_GID=1000
+      - MODE=onebot
+      # 快速登录：填你的 QQ 号，重启后自动登录，不需要重新扫码
+      - ACCOUNT=3811851103
+    ports:
+      # NapCat WebUI
+      - "6099:6099"
+      # OneBot HTTP / WebSocket 端口
+      - "3001:3001"
+    volumes:
+      # 映射 NapCat 配置和数据到当前项目目录
+      - ./data:/app/napcat
+    restart: unless-stopped
+
