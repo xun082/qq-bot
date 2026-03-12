@@ -23,8 +23,7 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY .env ./.env
 
-# Chainguard's node image typically sets ENTRYPOINT to `node`.
-# So CMD should contain only node arguments/script path.
-CMD ["--env-file=.env", "dist/index.js"]
+# 环境变量由运行时注入：docker run --env-file .env qq-bot（不要将 .env 打进镜像）
+# 该镜像 ENTRYPOINT 已是 node，这里只传脚本路径
+CMD ["dist/index.js"]
