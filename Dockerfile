@@ -25,5 +25,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY .env ./.env
 
-# NOTE: This intentionally loads env from the baked-in `.env`.
-CMD ["node", "--env-file=.env", "dist/index.js"]
+# Chainguard's node image typically sets ENTRYPOINT to `node`.
+# So CMD should contain only node arguments/script path.
+CMD ["--env-file=.env", "dist/index.js"]
