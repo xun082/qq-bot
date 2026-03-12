@@ -23,7 +23,7 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY .env ./.env
 
-# 环境变量由运行时注入，不要在这里写敏感信息
-# 运行示例: docker run --env-file .env your-image
-CMD ["node", "dist/index.js"]
+# NOTE: This intentionally loads env from the baked-in `.env`.
+CMD ["node", "--env-file=.env", "dist/index.js"]

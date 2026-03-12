@@ -1,7 +1,9 @@
 node_modules
 dist
-.env
-.env.*
+# WARNING: Including `.env` in the build context will bake secrets into the image.
+# Keep ignored by default. Remove these lines only if you intentionally want that.
+# .env
+# .env.*
 .git
 .gitignore
 *.md
