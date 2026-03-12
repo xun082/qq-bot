@@ -1,0 +1,10 @@
+self-hosted-runner:
+  labels: []
+
+paths:
+  .github/workflows/docker-image.yml:
+    ignore:
+      # Secrets are not discoverable by static analysis in this repo,
+      # so suppress false positives from the context-access check.
+      - '^Context access might be invalid: DOCKERHUB_(USERNAME|TOKEN)$'
+

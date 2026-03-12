@@ -1,0 +1,10 @@
+{
+  // The GitHub Actions VS Code language service can emit false positives like
+  // "Context access might be invalid" for `secrets.*` when it can't resolve
+  // repository/org secrets locally. Treat workflow files as plain YAML to
+  // avoid noisy diagnostics while keeping YAML language features.
+  "files.associations": {
+    ".github/workflows/*.yml": "yaml",
+    ".github/workflows/*.yaml": "yaml"
+  }
+}

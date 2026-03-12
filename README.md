@@ -21,14 +21,14 @@
 
 | 组件 | 端口 | 说明 |
 |------|------|------|
-| **NapCat WebUI** | **6099** | 浏览器访问，用于登录 QQ、配置 OneBot，仅本机或内网访问即可 |
-| **NapCat OneBot** | **3001** | HTTP / WebSocket，本机器人作为客户端连接此端口，需与 `ONEBOT_WS_URL` 一致 |
+| **NapCat WebUI** | **18741** | 浏览器访问，用于登录 QQ、配置 OneBot，仅本机或内网访问即可 |
+| **NapCat OneBot** | **18742** | HTTP / WebSocket，本机器人作为客户端连接此端口，需与 `ONEBOT_WS_URL` 一致 |
 | **QQ Bot 容器/进程** | **无** | 本机器人不监听任何端口，只主动连接 NapCat 和 RWKV API |
 
 **注意：**
 
-- 若 NapCat 与 QQ Bot 同机部署：`ONEBOT_WS_URL` 填 `ws://127.0.0.1:3001`（本机）或 `ws://宿主机IP:3001`（容器连宿主机）。
-- 若 QQ Bot 与 NapCat 在同一 Docker 网络：可填 `ws://napcat:3001`。
+- 若 NapCat 与 QQ Bot 同机部署：`ONEBOT_WS_URL` 填 `ws://127.0.0.1:18742`（本机）或 `ws://宿主机IP:18742`（容器连宿主机）。
+- 若 QQ Bot 与 NapCat 在同一 Docker 网络：可填 `ws://napcat:18742`。
 - 本机器人需能**访问** RWKV API（`RWKV_BASE_URL`），确保该地址在部署环境中可达（内网或 VPN 等）。
 
 ---
@@ -54,7 +54,7 @@ npm install
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `ONEBOT_WS_URL` | 是 | NapCat OneBot WebSocket 地址，如 `ws://127.0.0.1:3001` |
+| `ONEBOT_WS_URL` | 是 | NapCat OneBot WebSocket 地址，如 `ws://127.0.0.1:18742` |
 | `RWKV_BASE_URL` | 是 | RWKV API 基础地址（不要带末尾 `/`） |
 | `RWKV_PASSWORD` | 是 | 调用 RWKV API 的密码 |
 | `AI_SYSTEM_PROMPT` | 是 | 系统提示词（人格、语气等） |
@@ -77,13 +77,13 @@ docker compose up -d
 `docker-compose.yml` 要点：
 
 - 容器名：`napcat`
-- **端口映射**：WebUI `6099`，OneBot `3001`
+- **端口映射**：WebUI `18741`，OneBot `18742`
 - `ACCOUNT`：你的 QQ 号，用于自动登录
 
 启动后：
 
-1. 浏览器打开 `http://127.0.0.1:6099`，完成 QQ 登录与 OneBot 设置。  
-2. 在 NapCat 中启用 **OneBot v11 WebSocket 服务**，端口与 `.env` 中的 `ONEBOT_WS_URL` 一致（默认 3001）。
+1. 浏览器打开 `http://127.0.0.1:18741`，完成 QQ 登录与 OneBot 设置。  
+2. 在 NapCat 中启用 **OneBot v11 WebSocket 服务**，端口与 `.env` 中的 `ONEBOT_WS_URL` 一致（默认 18742）。
 
 ---
 
@@ -126,7 +126,7 @@ docker run -d --name qq-bot --env-file .env qq-bot
   docker run -d --name napcat --network qqbot-net ...  # 你的 napcat 启动方式
   docker run -d --name qq-bot --network qqbot-net --env-file .env qq-bot
   ```
-  此时 `.env` 中 `ONEBOT_WS_URL` 可设为 `ws://napcat:3001`。
+  此时 `.env` 中 `ONEBOT_WS_URL` 可设为 `ws://napcat:18742`。
   - 默认使用官方 `node:lts-alpine3.23` 作为基础镜像，具体 CVE 情况以官方镜像为准，如有安全合规要求请在部署环境中再用镜像扫描工具（如 Docker Scout / Trivy 等）进行校验。
 
 ---
@@ -149,10 +149,10 @@ docker run -d --name qq-bot --env-file .env qq-bot
   **A**: 按报错提示在 `.env` 中补齐对应变量后重试。
 
 - **Q: 群里 @ 了机器人但不回复？**  
-  **A**: 确认已 **@机器人**；检查 NapCat 是否启用 OneBot WebSocket，且 `ONEBOT_WS_URL` 的地址和端口（默认 3001）正确；若用 Docker，确认容器能访问 NapCat（网络/主机名/端口）。
+  **A**: 确认已 **@机器人**；检查 NapCat 是否启用 OneBot WebSocket，且 `ONEBOT_WS_URL` 的地址和端口（默认 18742）正确；若用 Docker，确认容器能访问 NapCat（网络/主机名/端口）。
 
 - **Q: 想改回复风格？**  
   **A**: 修改 `.env` 中的 `AI_SYSTEM_PROMPT`，重启本机器人即可。
 
 - **Q: 要开放哪些端口？**  
-  **A**: 只需保证 **NapCat** 的 **6099**（WebUI）、**3001**（OneBot）对运行 QQ Bot 的环境可达；QQ Bot 本身不监听端口，无需开放。
+  **A**: 只需保证 **NapCat** 的 **18741**（WebUI）、**18742**（OneBot）对运行 QQ Bot 的环境可达；QQ Bot 本身不监听端口，无需开放。
