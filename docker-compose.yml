@@ -26,7 +26,7 @@ services:
       # 和 napcat 同网，用服务名连接
       - ONEBOT_WS_URL=ws://napcat:18742
       - RWKV_BASE_URL=${RWKV_BASE_URL:-http://154.37.222.49:8193}
-      - RWKV_PASSWORD=${RWKV_PASSWORD:-}
+      - RWKV_PASSWORD=${RWKV_PASSWORD:-RWKV_7batch}
       - AI_SYSTEM_PROMPT=${AI_SYSTEM_PROMPT:-你是一个有帮助的 QQ 群/私聊机器人，回答简洁友好，使用中文。}
       - RWKV_MAX_TOKENS=${RWKV_MAX_TOKENS:-512}
       - HISTORY_LIMIT=${HISTORY_LIMIT:-20}

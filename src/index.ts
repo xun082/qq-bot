@@ -1,21 +1,14 @@
 import WebSocket from "ws";
 
-// ── 配置（全部从 .env 读取，缺少必填项直接退出）────────────────
-function requireEnv(key: string): string {
-  const val = process.env[key];
-  if (!val) {
-    console.error(`[QQ-BOT] 缺少必填环境变量: ${key}，请检查 .env 文件`);
-    process.exit(1);
-  }
-  return val;
-}
-
-const ONEBOT_WS_URL = requireEnv("ONEBOT_WS_URL");
-const RWKV_BASE_URL = requireEnv("RWKV_BASE_URL");
-const RWKV_PASSWORD = requireEnv("RWKV_PASSWORD");
-const RWKV_MAX_TOKENS = Number(requireEnv("RWKV_MAX_TOKENS"));
-const AI_SYSTEM = requireEnv("AI_SYSTEM_PROMPT");
-const HISTORY_LIMIT = Number(requireEnv("HISTORY_LIMIT"));
+// ── 配置（已写死默认值，无需 .env；需要改时用环境变量覆盖即可）────────
+const ONEBOT_WS_URL = process.env.ONEBOT_WS_URL ?? "ws://127.0.0.1:18742";
+const RWKV_BASE_URL = process.env.RWKV_BASE_URL ?? "http://154.37.222.49:8193";
+const RWKV_PASSWORD = process.env.RWKV_PASSWORD ?? "RWKV_7batch";
+const AI_SYSTEM =
+  process.env.AI_SYSTEM_PROMPT ??
+  "你是一个有帮助的 QQ 群/私聊机器人，回答简洁友好，使用中文。";
+const RWKV_MAX_TOKENS = Number(process.env.RWKV_MAX_TOKENS ?? "512");
+const HISTORY_LIMIT = Number(process.env.HISTORY_LIMIT ?? "20");
 const GROUP_LOG_LIMIT = Number(process.env.GROUP_LOG_LIMIT ?? "30");
 
 // ── OneBot v11 消息结构类型 ──────────────────────────────────────
