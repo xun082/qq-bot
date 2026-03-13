@@ -4,26 +4,24 @@
 
 ## 构建（本地）
 
+全家桶推成 **latest**，服务器只拉 `moment073/qq-bot:latest` 即可：
+
 ```bash
-docker build -f Dockerfile.allinone -t moment073/qq-bot-allinone:latest .
-# 推送
-docker push moment073/qq-bot-allinone:latest
+docker build -f Dockerfile.allinone -t moment073/qq-bot:latest .
+docker push moment073/qq-bot:latest
 ```
 
 ## 服务器上一键运行
 
-配置已写死在镜像里（QQ 号、RWKV 地址等），**只需一条命令**：
+先 `cd` 到要放数据的目录（如 `cd /opt/rwkv/apps/qq-bot`），然后整段粘贴执行：
 
 ```bash
-docker run -d --name qq-bot \
-  -v $(pwd)/data:/app/napcat \
-  -p 18741:18741 \
-  -p 18742:18742 \
-  --restart unless-stopped \
-  moment073/qq-bot-allinone:latest
+mkdir -p data && docker pull moment073/qq-bot:latest && \
+docker stop qq-bot 2>/dev/null; docker rm qq-bot 2>/dev/null; \
+docker run -d --name qq-bot -v "$(pwd)/data:/app/napcat" -p 18741:18741 -p 18742:18742 --restart unless-stopped moment073/qq-bot:latest
 ```
 
-- **数据持久化**：`-v $(pwd)/data:/app/napcat` 必须，否则重启后 QQ 需重新登录。
+- **数据持久化**：`-v $(pwd)/data:/app/napcat` 会把当前目录下的 `data` 挂进去，重启不丢登录。
 - 要改 QQ 号、RWKV 等：改 `Dockerfile.allinone` 里的 `ENV` 后重新 build 再 push。
 
 ## 查看日志

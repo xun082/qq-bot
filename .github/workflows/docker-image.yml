@@ -43,14 +43,6 @@ jobs:
             exit 1
           fi
 
-      - name: Extract version (sha7)
-        id: version
-        shell: bash
-        run: |
-          VERSION="$(echo "${GITHUB_SHA}" | cut -c1-7)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -72,12 +64,10 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets['DOCKERHUB_USERNAME'] }}
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.allinone
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -88,8 +78,6 @@ jobs:
         run: |
           echo "## Docker Build Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version: \`${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Image: \`${DOCKERHUB_USERNAME}/${{ env.IMAGE_NAME }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tags: \`latest\`, \`${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Platforms: \`linux/amd64\`, \`linux/arm64\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: \`${DOCKERHUB_USERNAME}/${{ env.IMAGE_NAME }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dockerfile: \`Dockerfile.allinone\` (NapCat + qq-bot)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"

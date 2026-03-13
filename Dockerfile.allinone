@@ -1,8 +1,8 @@
-# 全家桶镜像：NapCat + qq-bot 一个容器，服务器只需拉这一个镜像即可跑
+# 全家桶镜像：NapCat + qq-bot 一个容器，推成 latest 后服务器拉 latest 即可
 #
-# 构建: docker build -f Dockerfile.allinone -t moment073/qq-bot-allinone:latest .
-# 运行: docker run -d --name qq-bot -v $(pwd)/data:/app/napcat -p 18741:18741 -p 18742:18742 --restart unless-stopped moment073/qq-bot-allinone:latest
-# 详见 README-allinone.md
+# 构建: docker build -f Dockerfile.allinone -t moment073/qq-bot:latest .
+# 推送: docker push moment073/qq-bot:latest
+# 运行: docker run -d --name qq-bot -v $(pwd)/data:/app/napcat -p 18741:18741 -p 18742:18742 --restart unless-stopped moment073/qq-bot:latest
 
 # 阶段 1：构建 qq-bot
 FROM node:lts-alpine3.23 AS builder
