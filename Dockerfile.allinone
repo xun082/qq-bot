@@ -14,14 +14,8 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN pnpm run build && pnpm prune --prod
 
-# 阶段 2：NapCat 官方镜像 + Node + qq-bot
+# 阶段 2：NapCat 官方镜像 + qq-bot（NapCat 镜像本身已包含 Node）
 FROM mlikiowa/napcat-docker:latest
-# 安装 Node 与 curl（NapCat 就绪检测用）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 放入 qq-bot（与 NapCat 的 /app 分开，放在 /app/bot）
 COPY --from=builder /app/node_modules /app/bot/node_modules
