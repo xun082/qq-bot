@@ -203,6 +203,7 @@ function sendApi(
 
 // ── 主逻辑 ───────────────────────────────────────────────────────
 function start(): void {
+  console.log("[QQ-BOT] 连接 OneBot:", ONEBOT_WS_URL);
   const ws = new WebSocket(ONEBOT_WS_URL);
 
   ws.on("open", () => {
