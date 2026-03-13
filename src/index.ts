@@ -110,10 +110,7 @@ async function callAI(
 ): Promise<string> {
   pushHistory(historyKey, "user", userText);
 
-  const systemContent = [
-    AI_SYSTEM,
-    groupContext ?? "",
-  ]
+  const systemContent = [AI_SYSTEM, groupContext ?? ""]
     .filter(Boolean)
     .join("\n\n");
 
