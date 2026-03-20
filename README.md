@@ -156,3 +156,9 @@ docker run -d --name qq-bot --env-file .env qq-bot
 
 - **Q: 要开放哪些端口？**  
   **A**: 只需保证 **NapCat** 的 **18741**（WebUI）、**18742**（OneBot）对运行 QQ Bot 的环境可达；QQ Bot 本身不监听端口，无需开放。
+
+
+
+![20260320144148](https://raw.githubusercontent.com/xun082/md/main/blogs.images20260320144148.png)
+
+docker compose up -d --build qq-bot 2>&1

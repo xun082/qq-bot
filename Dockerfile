@@ -27,3 +27,4 @@ COPY --from=builder /app/dist ./dist
 # 应用内已有默认配置，可不传环境变量；需覆盖时再用 --env-file 或 -e
 # 该镜像 ENTRYPOINT 已是 node，这里只传脚本路径
 CMD ["dist/index.js"]
+

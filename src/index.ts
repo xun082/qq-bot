@@ -1,17 +1,32 @@
 import WebSocket from "ws";
 
-// ── 配置（已写死默认值，无需 .env；需要改时用环境变量覆盖即可）────────
+// ── 配置 ──────────────────────────────────────────────────────────
 const ONEBOT_WS_URL = process.env.ONEBOT_WS_URL ?? "ws://127.0.0.1:18742";
 const RWKV_BASE_URL = process.env.RWKV_BASE_URL ?? "http://154.37.222.49:8193";
 const RWKV_PASSWORD = process.env.RWKV_PASSWORD ?? "RWKV_7batch";
-const AI_SYSTEM =
-  process.env.AI_SYSTEM_PROMPT ??
-  "你是一个有帮助的 QQ 群/私聊机器人，回答简洁友好，使用中文。";
-const RWKV_MAX_TOKENS = Number(process.env.RWKV_MAX_TOKENS ?? "512");
-const HISTORY_LIMIT = Number(process.env.HISTORY_LIMIT ?? "20");
-const GROUP_LOG_LIMIT = Number(process.env.GROUP_LOG_LIMIT ?? "30");
+const AI_SYSTEM = `你是 RWKV，一个运行在 QQ 群聊和私聊中的中文机器人。
 
-// ── OneBot v11 消息结构类型 ──────────────────────────────────────
+默认使用中文回答。只在被用户明确提问、艾特或触发时回复，不主动插话。
+回复风格简洁、自然、友好、克制，优先直接回答问题，不要啰嗦，不要刷屏。
+对不确定的信息要明确说明，不要编造。技术问题先给结论，再给必要解释。
+当用户问“你是谁”“你是什么”“你是哪个模型”时，请回答：
+“我是 RWKV，一个基于 RWKV 模型的 QQ 聊天机器人。”
+不要声称自己是别的模型，不要冒充真人，不要夸大自己的能力。`;
+
+const RWKV_MAX_TOKENS = Number(process.env.RWKV_MAX_TOKENS ?? "512");
+
+// 每人独立保留最近 20 条消息（10 轮对话）
+const HISTORY_LIMIT = 20;
+
+const RWKV_TEMPERATURE = 0.8;
+const RWKV_TOP_P = 0.6;
+const RWKV_TOP_K = 50;
+const RWKV_ALPHA_PRESENCE = 1.0;
+const RWKV_ALPHA_FREQUENCY = 0.1;
+const RWKV_ALPHA_DECAY = 0.99;
+const RWKV_CHUNK_SIZE = 128;
+
+// ── 类型定义 ──────────────────────────────────────────────────────
 interface Sender {
   user_id: number;
   nickname?: string;
@@ -30,40 +45,13 @@ interface OneBotMessage {
 }
 
 interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "user" | "assistant";
   content: string;
 }
 
-// 群消息日志条目
-interface GroupLogEntry {
-  nickname: string;
-  text: string;
-}
-
-// ── 对话历史管理 ─────────────────────────────────────────────────
+// ── 每人独立对话历史 ──────────────────────────────────────────────
+// key: "private_{user_id}" 或 "group_{group_id}_{user_id}"
 const histories = new Map<string, ChatMessage[]>();
-
-// ── 群消息滚动日志（每个群独立保存最近 N 条明文消息）────────────
-const groupLogs = new Map<number, GroupLogEntry[]>();
-
-function appendGroupLog(groupId: number, nickname: string, text: string): void {
-  if (!groupLogs.has(groupId)) groupLogs.set(groupId, []);
-  const log = groupLogs.get(groupId)!;
-  log.push({ nickname, text });
-  if (log.length > GROUP_LOG_LIMIT) log.splice(0, log.length - GROUP_LOG_LIMIT);
-}
-
-function getGroupLogContext(groupId: number, excludeLast = false): string {
-  const log = groupLogs.get(groupId);
-  if (!log || log.length === 0) return "";
-
-  const effectiveLog =
-    excludeLast && log.length > 0 ? log.slice(0, log.length - 1) : log;
-  if (effectiveLog.length === 0) return "";
-
-  const lines = effectiveLog.map((e) => `${e.nickname}: ${e.text}`).join("\n");
-  return `以下是群里最近 ${effectiveLog.length} 条消息记录（供你参考）：\n${lines}`;
-}
 
 function getHistory(key: string): ChatMessage[] {
   if (!histories.has(key)) histories.set(key, []);
@@ -77,16 +65,14 @@ function pushHistory(
 ): void {
   const h = getHistory(key);
   h.push({ role, content });
-  // 保留最近 N 条（按条数，每轮对话占 2 条）
   if (h.length > HISTORY_LIMIT) h.splice(0, h.length - HISTORY_LIMIT);
 }
 
-// 用户输入规范化：去首尾空白、统一换行、合并连续换行
+// ── 工具函数 ──────────────────────────────────────────────────────
 function normalizeInput(text: string): string {
   return text.trim().replace(/\r\n/g, "\n").replace(/\n+/g, "\n");
 }
 
-// 把回复里的 Markdown 转成纯文本
 function toPlainText(text: string): string {
   return text
     .replace(/\*\*([^*]+)\*\*/g, "$1")
@@ -102,81 +88,6 @@ function toPlainText(text: string): string {
     .trim();
 }
 
-// ── 公司 RWKV 模型 API 调用 ──────────────────────────────────────
-async function callAI(
-  historyKey: string,
-  userText: string,
-  groupContext?: string,
-): Promise<string> {
-  pushHistory(historyKey, "user", userText);
-
-  const systemContent = [AI_SYSTEM, groupContext ?? ""]
-    .filter(Boolean)
-    .join("\n\n");
-
-  // RWKV 是纯文本生成模型，把对话历史拼成结构化文本 prompt
-  let prompt = `System: ${systemContent}\n\n`;
-  for (const msg of getHistory(historyKey)) {
-    if (msg.role === "user") {
-      prompt += `User: ${msg.content}\n\n`;
-    } else if (msg.role === "assistant") {
-      prompt += `Assistant: ${msg.content}\n\n`;
-    }
-  }
-  prompt += "Assistant:";
-
-  console.log("[QQ-BOT][AI 调用] 完整 Prompt:\n", prompt);
-
-  const res = await fetch(`${RWKV_BASE_URL}/v2/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      contents: [prompt],
-      stream: false,
-      password: RWKV_PASSWORD,
-      max_tokens: RWKV_MAX_TOKENS,
-      temperature: 1.0,
-      top_p: 0.3,
-      top_k: 100,
-      alpha_presence: 0.5,
-      alpha_frequency: 0.5,
-      alpha_decay: 0.996,
-      chunk_size: 128,
-      pad_zero: true,
-      stop_tokens: [0, 261, 24281],
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`RWKV API ${res.status}: ${errText}`);
-  }
-
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string }; text?: string }[];
-  };
-
-  const raw = (
-    json.choices?.[0]?.message?.content ??
-    json.choices?.[0]?.text ??
-    ""
-  ).trim();
-
-  console.log("[QQ-BOT][AI 返回] 原始模型输出:\n", raw);
-
-  // 防止模型继续生成下一轮 "User:" 内容
-  const stopIdx = raw.search(/\n\s*User:/i);
-  const reply =
-    toPlainText(stopIdx !== -1 ? raw.slice(0, stopIdx) : raw) || "（无回复）";
-
-  pushHistory(historyKey, "assistant", reply);
-  console.log("[QQ-BOT][AI 处理后回复]:", reply);
-  return reply;
-}
-
-// ── 工具函数 ─────────────────────────────────────────────────────
-
-// 把 [CQ:at,qq=X] 转成 @X 保留给 AI，其他 CQ 码（图片/表情等）直接删除
 function stripCQ(raw: string, selfId?: number): string {
   return raw
     .replace(/\[CQ:at,qq=(\d+)\]/g, (_, qq) =>
@@ -198,7 +109,70 @@ function sendApi(
   ws.send(JSON.stringify({ action, params, echo: `${action}-${Date.now()}` }));
 }
 
-// ── 主逻辑 ───────────────────────────────────────────────────────
+// ── RWKV API 调用 ─────────────────────────────────────────────────
+async function callAI(historyKey: string, userText: string): Promise<string> {
+  pushHistory(historyKey, "user", userText);
+
+  let prompt = `System: ${AI_SYSTEM}\n\n`;
+  for (const msg of getHistory(historyKey)) {
+    prompt +=
+      msg.role === "user"
+        ? `User: ${msg.content}\n\n`
+        : `Assistant: ${msg.content}\n\n`;
+  }
+  prompt += "Assistant: <think>\n</think>\n";
+
+  console.log("[QQ-BOT][AI 调用] Prompt:\n", prompt);
+
+  const res = await fetch(`${RWKV_BASE_URL}/v2/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      contents: [prompt],
+      max_tokens: RWKV_MAX_TOKENS,
+      stop_tokens: [0, 261, 24281],
+      temperature: RWKV_TEMPERATURE,
+      top_k: RWKV_TOP_K,
+      top_p: RWKV_TOP_P,
+      alpha_presence: RWKV_ALPHA_PRESENCE,
+      alpha_frequency: RWKV_ALPHA_FREQUENCY,
+      alpha_decay: RWKV_ALPHA_DECAY,
+      stream: false,
+      chunk_size: RWKV_CHUNK_SIZE,
+      password: RWKV_PASSWORD,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`RWKV API ${res.status}: ${errText}`);
+  }
+
+  const json = (await res.json()) as {
+    choices?: { message?: { content?: string }; text?: string }[];
+  };
+
+  const raw = (
+    json.choices?.[0]?.message?.content ??
+    json.choices?.[0]?.text ??
+    ""
+  ).trim();
+
+  console.log("[QQ-BOT][AI 返回] 原始输出:\n", raw);
+
+  const withoutThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const stopIdx = withoutThink.search(/\n\s*User:/i);
+  const reply =
+    toPlainText(
+      stopIdx !== -1 ? withoutThink.slice(0, stopIdx) : withoutThink,
+    ) || "（无回复）";
+
+  pushHistory(historyKey, "assistant", reply);
+  console.log("[QQ-BOT][AI 处理后回复]:", reply);
+  return reply;
+}
+
+// ── 主逻辑 ────────────────────────────────────────────────────────
 function start(): void {
   console.log("[QQ-BOT] 连接 OneBot:", ONEBOT_WS_URL);
   const ws = new WebSocket(ONEBOT_WS_URL);
@@ -230,7 +204,7 @@ function start(): void {
       payload;
     const nickname = sender?.card || sender?.nickname || String(user_id);
 
-    // ── 私聊：全部走 AI ──────────────────────────────
+    // ── 私聊 ────────────────────────────────────────
     if (message_type === "private") {
       const text = normalizeInput(raw_message);
       if (!text) return;
@@ -239,7 +213,6 @@ function start(): void {
 
       callAI(`private_${user_id}`, text)
         .then((reply) => {
-          console.log(`[私聊回复] -> ${reply}`);
           sendApi(ws, "send_private_msg", { user_id, message: reply });
         })
         .catch((err: Error) => {
@@ -251,17 +224,13 @@ function start(): void {
         });
     }
 
-    // ── 群聊 ────────────────────────────────────────
+    // ── 群聊：每个人独立上下文，互不干扰 ──────────
     if (message_type === "group" && group_id !== undefined) {
-      const plainText = normalizeInput(stripCQ(raw_message, self_id));
-
-      // 所有群消息都记入滚动日志（包括未 @ 的）
-      if (plainText) appendGroupLog(group_id, nickname, plainText);
-
-      // 只有 @ 机器人才触发 AI 回复
       if (!isAtMe(raw_message, self_id)) return;
 
-      if (!plainText) {
+      const text = normalizeInput(stripCQ(raw_message, self_id));
+
+      if (!text) {
         sendApi(ws, "send_group_msg", {
           group_id,
           message: `[CQ:at,qq=${user_id}] 有什么事喊我~`,
@@ -269,16 +238,11 @@ function start(): void {
         return;
       }
 
-      console.log(`[群聊] ${group_id} | ${nickname}(${user_id}): ${plainText}`);
+      console.log(`[群聊] ${group_id} | ${nickname}(${user_id}): ${text}`);
 
-      // 把最近 N 条群消息（不含当前这条）拼进 system prompt，让 AI 有群聊背景
-      const groupContext = getGroupLogContext(group_id, true);
-
-      callAI(`group_${group_id}_${user_id}`, plainText, groupContext)
+      // key 包含 group_id + user_id，群里每个人完全独立
+      callAI(`group_${group_id}_${user_id}`, text)
         .then((reply) => {
-          console.log(`[群聊回复] -> ${reply}`);
-          // AI 的回复也记入群日志，让后续提问能看到完整对话
-          appendGroupLog(group_id!, "机器人", reply);
           sendApi(ws, "send_group_msg", {
             group_id,
             message: `[CQ:at,qq=${user_id}] ${reply}`,

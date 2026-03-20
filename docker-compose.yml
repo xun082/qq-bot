@@ -1,7 +1,3 @@
-# 服务器仅拉取镜像部署：把本文件放到某目录，创建 data 目录后执行:
-#   docker compose pull && docker compose up -d
-# 有完整仓库时可用: bash scripts/deploy-server.sh
-
 services:
   napcat:
     image: mlikiowa/napcat-docker:latest
@@ -14,20 +10,16 @@ services:
       # 快速登录：填你的 QQ 号，重启后自动登录，不需要重新扫码
       - ACCOUNT=3811851103
     ports:
-      - "18741:18741"   # NapCat WebUI
-      - "18742:18742"   # OneBot WebSocket
+      - "18741:6099"   # NapCat WebUI（容器内 6099，对外 18741）
+      - "18742:18742"  # OneBot WebSocket
     volumes:
       - ./data:/app/napcat
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:18741/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
 
   qq-bot:
-    image: moment073/qq-bot:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: qq-bot
     environment:
       - ONEBOT_WS_URL=ws://napcat:18742
@@ -38,6 +30,5 @@ services:
       - HISTORY_LIMIT=${HISTORY_LIMIT:-20}
       - GROUP_LOG_LIMIT=${GROUP_LOG_LIMIT:-30}
     depends_on:
-      napcat:
-        condition: service_healthy
+      - napcat
     restart: unless-stopped
